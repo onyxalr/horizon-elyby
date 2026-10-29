@@ -207,6 +207,7 @@ fn the_whole_chain() {
                 "slim".into()
             )),
             cape: Some("http://textures.minecraft.net/texture/cape2".into()),
+            kind: "msa".into(),
         }
     );
     assert_eq!(secrets.minecraft_token, "mc-token");
@@ -243,6 +244,7 @@ fn notch() -> Account {
         name: "Notch".into(),
         skin: None,
         cape: None,
+        kind: "msa".into(),
     }
 }
 
@@ -254,6 +256,9 @@ fn secrets(token: &str, owns: bool) -> Secrets {
         minecraft_expires_at: now() + 7200,
         xuid: None,
         owns,
+        ely_access_token: String::new(),
+        ely_client_token: String::new(),
+        ely_profile_id: String::new(),
     }
 }
 
@@ -395,6 +400,7 @@ fn any_owner_opens_the_gate_and_the_one_who_plays_brings_the_session() {
         name: "Alex".into(),
         skin: None,
         cape: None,
+        kind: "msa".into(),
     });
     accounts.selected = Some("other".into());
     let pass = launch(&ep, Some("test-client"), &store, &mut accounts).unwrap();
@@ -532,12 +538,16 @@ fn accounts_keep_secrets_in_the_store_only() {
         name: "Notch".into(),
         skin: None,
         cape: None,
+        kind: "msa".into(),
     };
     let secrets = Secrets {
         refresh_token: "r".into(),
         minecraft_token: "mc-secret".into(),
         minecraft_expires_at: 1,
         xuid: None,
+        ely_access_token: String::new(),
+        ely_client_token: String::new(),
+        ely_profile_id: String::new(),
         owns: true,
     };
     accounts.add(&store, account.clone(), &secrets).unwrap();
@@ -596,6 +606,7 @@ fn session_files_are_private_and_complete() {
         name: "Notch".into(),
         skin: None,
         cape: None,
+        kind: "msa".into(),
     };
     let secrets = Secrets {
         refresh_token: "r".into(),
@@ -603,6 +614,9 @@ fn session_files_are_private_and_complete() {
         minecraft_expires_at: 1,
         xuid: Some("25".into()),
         owns: true,
+        ely_access_token: String::new(),
+        ely_client_token: String::new(),
+        ely_profile_id: String::new(),
     };
     let path = write_session_file(&dir, &account, &secrets).unwrap();
     let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
@@ -653,6 +667,7 @@ fn offline_names_switch_with_accounts() {
             name: "Ludo".into(),
             skin: None,
             cape: None,
+            kind: "msa".into(),
         }],
         selected: Some("abc".into()),
         ..Accounts::default()
