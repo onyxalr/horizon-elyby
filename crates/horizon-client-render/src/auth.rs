@@ -20,6 +20,8 @@ pub struct AuthSession {
     pub uuid: u128,
     pub xuid: Option<String>,
     access_token: String,
+    /// "msa" (Microsoft) or "ely" (Ely.by).
+    pub user_type: String,
 }
 impl std::fmt::Debug for AuthSession {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -47,6 +49,7 @@ impl AuthSession {
             uuid,
             xuid: None,
             access_token: access_token.to_owned(),
+            user_type: "msa".to_owned(),
         }
     }
     /// The session file's JSON: {"name", "uuid", "access_token", "user_type": "msa", "xuid"}.
@@ -64,14 +67,17 @@ impl AuthSession {
         let access_token = field("access_token")
             .filter(|t| !t.is_empty())
             .ok_or("the session file has no access token")?;
-        if field("user_type").is_some_and(|t| t != "msa") {
-            return Err("the session file is not a Microsoft account session".into());
+        let user_type = field("user_type").unwrap_or("msa");
+        if user_type != "msa" && user_type != "ely" && user_type != "elyby" {
+            return Err("the session file is not a supported account session".into());
         }
+        let user_type = if user_type == "elyby" { "ely" } else { user_type }.to_owned();
         Ok(Self {
             name: name.to_owned(),
             uuid,
             xuid: field("xuid").map(str::to_owned),
             access_token: access_token.to_owned(),
+            user_type,
         })
     }
     /// Read the session file the launcher wrote and delete it at once. It
@@ -216,19 +222,35 @@ pub fn join_request(session: &AuthSession, server_hash: &str) -> String {
 /// MinecraftServicesSessionService.joinServer: tell the session service this
 /// account is joining the server whose hash is `server_hash`.
 pub fn join_server(session: &AuthSession, server_hash: &str) -> Result<(), JoinError> {
-    let doc = discovery()?;
-    let url = endpoint(&doc, "session", "join").ok_or(JoinError::Unavailable)?;
-    match agent()
-        .post(&url)
-        .set("Content-Type", "application/json; charset=utf-8")
-        .send_string(&join_request(session, server_hash))
-    {
-        Ok(_) => Ok(()),
-        Err(ureq::Error::Status(status, response)) => Err(JoinError::from_response(
-            status,
-            &response.into_string().unwrap_or_default(),
-        )),
-        Err(ureq::Error::Transport(_)) => Err(JoinError::Unavailable),
+    if session.user_type == "ely" {
+        let url = "https://authserver.ely.by/session/minecraft/join";
+        match agent()
+            .post(url)
+            .set("Content-Type", "application/json; charset=utf-8")
+            .send_string(&join_request(session, server_hash))
+        {
+            Ok(_) => Ok(()),
+            Err(ureq::Error::Status(status, response)) => Err(JoinError::from_response(
+                status,
+                &response.into_string().unwrap_or_default(),
+            )),
+            Err(ureq::Error::Transport(_)) => Err(JoinError::Unavailable),
+        }
+    } else {
+        let doc = discovery()?;
+        let url = endpoint(&doc, "session", "join").ok_or(JoinError::Unavailable)?;
+        match agent()
+            .post(&url)
+            .set("Content-Type", "application/json; charset=utf-8")
+            .send_string(&join_request(session, server_hash))
+        {
+            Ok(_) => Ok(()),
+            Err(ureq::Error::Status(status, response)) => Err(JoinError::from_response(
+                status,
+                &response.into_string().unwrap_or_default(),
+            )),
+            Err(ureq::Error::Transport(_)) => Err(JoinError::Unavailable),
+        }
     }
 }
 
@@ -264,8 +286,28 @@ pub fn has_joined(
     server_hash: &str,
     ip: Option<std::net::IpAddr>,
 ) -> Result<Option<JoinedProfile>, JoinError> {
-    let doc = discovery()?;
-    let url = endpoint(&doc, "session", "verify").ok_or(JoinError::Unavailable)?;
+    // Try Microsoft first.
+    let ms = has_joined_microsoft(name, server_hash, ip);
+    if let Ok(Some(profile)) = ms {
+        return Ok(Some(profile));
+    }
+    // Fall back to Ely.by.
+    has_joined_ely(name, server_hash, ip)
+}
+
+fn has_joined_microsoft(
+    name: &str,
+    server_hash: &str,
+    ip: Option<std::net::IpAddr>,
+) -> Result<Option<JoinedProfile>, JoinError> {
+    let doc = match discovery() {
+        Ok(d) => d,
+        Err(e) => return Err(e),
+    };
+    let url = match endpoint(&doc, "session", "verify") {
+        Some(u) => u,
+        None => return Ok(None),
+    };
     let mut query = format!(
         "username={}&serverId={}",
         url_encode(name),
@@ -285,6 +327,28 @@ pub fn has_joined(
                 _ => Ok(None),
             };
         }
+        Err(ureq::Error::Transport(_)) => return Err(JoinError::Unavailable),
+    };
+    Ok(parse_joined(&body))
+}
+
+fn has_joined_ely(
+    name: &str,
+    server_hash: &str,
+    ip: Option<std::net::IpAddr>,
+) -> Result<Option<JoinedProfile>, JoinError> {
+    let mut query = format!(
+        "username={}&serverId={}",
+        url_encode(name),
+        url_encode(server_hash)
+    );
+    if let Some(ip) = ip {
+        query.push_str(&format!("&ip={}", url_encode(&ip.to_string())));
+    }
+    let url = format!("https://authserver.ely.by/session/minecraft/hasJoined?{query}");
+    let body = match agent().get(&url).call() {
+        Ok(response) => response.into_string().unwrap_or_default(),
+        Err(ureq::Error::Status(_, _)) => return Ok(None),
         Err(ureq::Error::Transport(_)) => return Err(JoinError::Unavailable),
     };
     Ok(parse_joined(&body))

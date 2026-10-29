@@ -101,6 +101,13 @@ enum AccountCmd {
     /// Sign in with a Microsoft account in your browser (device code). Play needs one that owns
     /// Minecraft: Java Edition
     SignIn,
+    /// Sign in with an Ely.by account (username and password)
+    SignInElyBy {
+        /// Ely.by username or e-mail
+        username: String,
+        /// Ely.by password
+        password: String,
+    },
     /// Sign out: the account's tokens leave the keychain
     SignOut {
         /// Its name or UUID
@@ -1565,6 +1572,15 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
             accounts.add(account::store(), signed_in.clone(), &secrets)?;
             accounts.save()?;
             println!("Signed in as {}.", signed_in.name);
+            if !account::store().persistent() {
+                eprintln!("{}", account::NO_KEYCHAIN);
+            }
+        }
+        AccountCmd::SignInElyBy { username, password } => {
+            let (signed_in, secrets) = account::elyby_sign_in(&username, &password)?;
+            accounts.add(account::store(), signed_in.clone(), &secrets)?;
+            accounts.save()?;
+            println!("Signed in as {} (Ely.by).", signed_in.name);
             if !account::store().persistent() {
                 eprintln!("{}", account::NO_KEYCHAIN);
             }

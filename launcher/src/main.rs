@@ -50,7 +50,7 @@ use gpui::{
     FontWeight, Hsla, KeyBinding, KeyDownEvent, Menu, MenuItem, PathPromptOptions, SharedString,
     Stateful, Subscription, Window, WindowBounds, WindowOptions,
 };
-use horizon_launcher::account::{self, Accounts, SignIn, SignInState};
+use horizon_launcher::account::{self, Accounts, ElySignIn, SignIn, SignInState};
 use horizon_launcher::backend::{self, Job, Msg, Release, Running, Settings, Updates};
 use horizon_launcher::i18n::{self, tr, trf};
 use horizon_launcher::instances;
@@ -206,6 +206,7 @@ struct Launcher {
     /// Microsoft accounts (accounts.json), the sign-in under way and what it last showed.
     accounts: Accounts,
     sign_in: Option<SignIn>,
+    ely_sign_in: Option<ElySignIn>,
     sign_in_state: Option<SignInState>,
     keychain: bool,
     /// Whether an account here owns the game, by the keychain's last answers (the owner gate);
@@ -421,6 +422,7 @@ impl Launcher {
             root_focus: cx.focus_handle(),
             accounts: Accounts::load(),
             sign_in: None,
+            ely_sign_in: None,
             sign_in_state: None,
             keychain: true,
             owner: None,
@@ -941,7 +943,6 @@ impl Launcher {
             if changed_state {
                 if let SignInState::Done(Ok(_)) = state {
                     self.accounts = Accounts::load();
-                    // Sign-in refuses accounts that don't own the game.
                     self.owner = Some(true);
                     self.owner_screen_open = false;
                     self.client_error = None;
@@ -949,6 +950,20 @@ impl Launcher {
                         self.settings.owner_notice_seen = true;
                         self.settings.save();
                     }
+                }
+                self.sign_in_state = Some(state);
+                changed = true;
+            }
+        }
+        if let Some(sign_in) = &self.ely_sign_in {
+            let state = sign_in.state();
+            let changed_state = format!("{state:?}") != format!("{:?}", self.sign_in_state);
+            if changed_state {
+                if let SignInState::Done(Ok(_)) = state {
+                    self.accounts = Accounts::load();
+                    self.owner = Some(true);
+                    self.owner_screen_open = false;
+                    self.client_error = None;
                 }
                 self.sign_in_state = Some(state);
                 changed = true;
@@ -1140,6 +1155,24 @@ impl Launcher {
         if let Some(old) = self.sign_in.replace(SignIn::start()) {
             old.cancel();
         }
+        self.sign_in_state = Some(SignInState::Starting);
+    }
+
+    fn elyby_sign_in_from_fields(&mut self) {
+        let username = self.servers.value(servers_page::Field::ElyUser).trim().to_string();
+        let password = self.servers.value(servers_page::Field::ElyPass).to_string();
+        if username.is_empty() || password.is_empty() {
+            self.sign_in_state = Some(SignInState::Done(Err(
+                "Type an Ely.by username and password.".into(),
+            )));
+            return;
+        }
+        self.servers.text(servers_page::Field::ElyUser).clear();
+        self.servers.text(servers_page::Field::ElyPass).clear();
+        if let Some(old) = self.ely_sign_in.take() {
+            old.cancel();
+        }
+        self.ely_sign_in = Some(ElySignIn::start(username, password));
         self.sign_in_state = Some(SignInState::Starting);
     }
 
@@ -3402,10 +3435,16 @@ impl Launcher {
                 );
             } else {
                 let uuid = uuid.clone();
+                let play_variant = if a.kind == "elyby" {
+                    account::Player::ElyBy(uuid.clone())
+                } else {
+                    account::Player::Microsoft(uuid.clone())
+                };
+
                 actions = actions.child(
                     button(format!("select-{i}"), "Play as", Kind::Secondary, &t).on_click(
                         cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            this.play_as(account::Player::Microsoft(uuid.clone()));
+                            this.play_as(play_variant.clone());
                             cx.notify();
                         }),
                     ),
@@ -3434,9 +3473,9 @@ impl Launcher {
                 Some(
                     div()
                         .child(tr(if plays {
-                            "Microsoft account · plays"
+                            if a.kind == "elyby" { "Ely.by account · plays" } else { "Microsoft account · plays" }
                         } else {
-                            "Microsoft account · signed in"
+                            if a.kind == "elyby" { "Ely.by account · signed in" } else { "Microsoft account · signed in" }
                         }))
                         .into_any_element(),
                 ),
@@ -3541,6 +3580,33 @@ impl Launcher {
             tr(title),
             Some(detail.into_any_element()),
             action,
+            &t,
+        ));
+        // Ely.by sign-in row.
+        n += 1;
+        let ely_detail = div()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .child(self.field(servers_page::Field::ElyUser, "Ely.by username", 220., cx))
+            .child(self.field(servers_page::Field::ElyPass, "Ely.by password", 220., cx));
+        let ely_action = if busy {
+            None
+        } else {
+            Some(
+                button("ely-sign-in", "Sign in with Ely.by", Kind::Secondary, &t)
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.elyby_sign_in_from_fields();
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            )
+        };
+        rows = rows.child(index_row(
+            n,
+            tr("Ely.by account"),
+            Some(ely_detail.into_any_element()),
+            ely_action,
             &t,
         ));
         (rows, n)

@@ -32,6 +32,9 @@ pub(super) enum Field {
     Port,
     Token,
     Email,
+    /// Ely.by sign-in fields.
+    ElyUser,
+    ElyPass,
     /// The instance dialog's (`instances_page.rs`).
     InstanceName,
     InstanceGroup,
@@ -50,7 +53,7 @@ pub(super) enum Field {
 }
 
 impl Field {
-    const ALL: [Field; 19] = [
+    const ALL: [Field; 21] = [
         Field::Name,
         Field::Seed,
         Field::Players,
@@ -60,6 +63,8 @@ impl Field {
         Field::Port,
         Field::Token,
         Field::Email,
+        Field::ElyUser,
+        Field::ElyPass,
         Field::InstanceName,
         Field::InstanceGroup,
         Field::ServerName,
@@ -947,7 +952,7 @@ impl Launcher {
         let value = self.servers.value(f).to_string();
         let shown: String = {
             let chars: Vec<char> = value.chars().collect();
-            if f == Field::Token {
+            if f == Field::Token || f == Field::ElyPass {
                 "•".repeat(chars.len().min(40))
             } else {
                 chars[chars.len().saturating_sub(60)..].iter().collect()
@@ -1077,6 +1082,7 @@ impl Launcher {
             Field::Port => self.save_port(),
             Field::Token => self.save_token(),
             Field::Email => self.invite_friend(),
+            Field::ElyUser | Field::ElyPass => self.elyby_sign_in_from_fields(),
             Field::InstanceName
             | Field::InstanceGroup
             | Field::ConsoleSearch
