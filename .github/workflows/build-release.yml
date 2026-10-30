@@ -16,12 +16,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libfontconfig-dev libvulkan-dev libasound2-dev libudev-dev
       - name: Build launcher
         working-directory: launcher
-        run: cargo build --release
+        run: cargo build --release --locked
       - name: Build client
-        run: cargo build --release -p horizon-client
+        run: cargo build --release --locked -p horizon-client
       - name: Package
         run: |
           mkdir -p out
@@ -40,9 +40,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build launcher
         working-directory: launcher
-        run: cargo build --release
+        run: cargo build --release --locked
       - name: Build client
-        run: cargo build --release -p horizon-client
+        run: cargo build --release --locked -p horizon-client
       - name: Package
         shell: pwsh
         run: |
