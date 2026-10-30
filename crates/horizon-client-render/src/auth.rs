@@ -305,10 +305,7 @@ fn has_joined_microsoft(
     server_hash: &str,
     ip: Option<std::net::IpAddr>,
 ) -> Result<Option<JoinedProfile>, JoinError> {
-    let doc = match discovery() {
-        Ok(d) => d,
-        Err(e) => return Err(e),
-    };
+    let doc = discovery()?;
     let url = match endpoint(&doc, "session", "verify") {
         Some(u) => u,
         None => return Ok(None),
