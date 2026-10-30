@@ -545,7 +545,10 @@ fn fetch_elyby_skin(uuid_nodash: &str) -> (Option<(String, String)>, Option<Stri
     } else {
         uuid_nodash.to_string()
     };
-    let url = format!("{}/session/minecraft/profile/{}?unsigned=false", ELYBY_AUTH, uuid_dashed);
+    let url = format!(
+        "{}/session/minecraft/profile/{}?unsigned=false",
+        ELYBY_AUTH, uuid_dashed
+    );
     let (status, v) = match send(request_to("GET", &url), None, "Ely.by") {
         Ok(r) => r,
         Err(_) => return (None, None),

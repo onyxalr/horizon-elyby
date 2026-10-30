@@ -48,11 +48,7 @@ impl Launcher {
             .iter()
             .map(|a| {
                 if a.is_elyby() {
-                    (
-                        Player::ElyBy(a.uuid.clone()),
-                        a.name.clone(),
-                        tr("Ely.by"),
-                    )
+                    (Player::ElyBy(a.uuid.clone()), a.name.clone(), tr("Ely.by"))
                 } else {
                     (
                         Player::Microsoft(a.uuid.clone()),

@@ -71,7 +71,12 @@ impl AuthSession {
         if user_type != "msa" && user_type != "ely" && user_type != "elyby" {
             return Err("the session file is not a supported account session".into());
         }
-        let user_type = if user_type == "elyby" { "ely" } else { user_type }.to_owned();
+        let user_type = if user_type == "elyby" {
+            "ely"
+        } else {
+            user_type
+        }
+        .to_owned();
         Ok(Self {
             name: name.to_owned(),
             uuid,

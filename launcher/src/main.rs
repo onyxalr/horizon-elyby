@@ -1159,7 +1159,11 @@ impl Launcher {
     }
 
     fn elyby_sign_in_from_fields(&mut self) {
-        let username = self.servers.value(servers_page::Field::ElyUser).trim().to_string();
+        let username = self
+            .servers
+            .value(servers_page::Field::ElyUser)
+            .trim()
+            .to_string();
         let password = self.servers.value(servers_page::Field::ElyPass).to_string();
         if username.is_empty() || password.is_empty() {
             self.sign_in_state = Some(SignInState::Done(Err(
@@ -3473,9 +3477,17 @@ impl Launcher {
                 Some(
                     div()
                         .child(tr(if plays {
-                            if a.kind == "elyby" { "Ely.by account · plays" } else { "Microsoft account · plays" }
+                            if a.kind == "elyby" {
+                                "Ely.by account · plays"
+                            } else {
+                                "Microsoft account · plays"
+                            }
                         } else {
-                            if a.kind == "elyby" { "Ely.by account · signed in" } else { "Microsoft account · signed in" }
+                            if a.kind == "elyby" {
+                                "Ely.by account · signed in"
+                            } else {
+                                "Microsoft account · signed in"
+                            }
                         }))
                         .into_any_element(),
                 ),
