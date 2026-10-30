@@ -617,7 +617,7 @@ enum Cmd {
         #[arg(long)]
         version: Option<String>,
     },
-    /// Start the client (needs a signed-in Microsoft account that owns Minecraft: Java Edition)
+    /// Start the client (needs a signed-in account that owns Minecraft: Java Edition: Microsoft or Ely.by)
     Play {
         #[arg(long)]
         version: Option<String>,
