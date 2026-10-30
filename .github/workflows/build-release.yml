@@ -1,0 +1,69 @@
+name: Build release (Linux + Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+      - name: Build launcher
+        working-directory: launcher
+        run: cargo build --release
+      - name: Build client
+        run: cargo build --release -p horizon-client
+      - name: Package
+        run: |
+          mkdir -p out
+          cp launcher/target/release/horizon-launcher out/
+          cp target/release/horizon-client out/
+          tar czf horizon-elyby-linux-x86_64.tar.gz -C out .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: horizon-elyby-linux-x86_64.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build launcher
+        working-directory: launcher
+        run: cargo build --release
+      - name: Build client
+        run: cargo build --release -p horizon-client
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item launcher/target/release/horizon-launcher.exe out/
+          Copy-Item target/release/horizon-client.exe out/
+          Compress-Archive -Path out/* -DestinationPath horizon-elyby-windows-x86_64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: horizon-elyby-windows-x86_64.zip
+
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
